@@ -1,51 +1,15 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
-from mlxtend.evaluate import bias_variance_decomp
 import matplotlib.pyplot as plt
-data = pd.read_csv('https://raw.githubusercontent.com/mwaskom/seaborn-data/refs/heads/master/diamonds.csv')
-
-def calc_metrics(x, y, degree = 2, nruns = 50):
-    x, y = np.array(x), np.array(y)
-    # Reshaping if only one feature is given
-    if x.size / y.size == 1:
-        x = x.reshape(-1, 1)
-    # Train-test split
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.33, random_state=123)
-    # Polynomial transformation
-    poly = PolynomialFeatures(degree)
-    x_train_poly = poly.fit_transform(x_train)
-    x_test_poly = poly.transform(x_test)
-    mse, bias, var = bias_variance_decomp(LinearRegression(), x_train_poly, y_train, x_test_poly, y_test, loss='mse', num_rounds=nruns, random_seed=123)
-    return mse, bias, var
-
-def compute_table(x, y, degree, nruns):
-    d = {
-        'degree' : [],
-        'mse' : [],
-        'bias_squared' : [],
-        'variance' : []
-    }
-    # Calculating all model stats until parameter degree
-    for i in range(1, degree + 1):
-        m, b, v = calc_metrics(x, y, i, nruns)
-        d['degree'].append(i)
-        d['mse'].append(m)
-        d['bias_squared'].append(b)
-        d['variance'].append(v)
-    return pd.DataFrame(d)
+data = pd.read_csv('simulated_data.csv')
     
 def plot_bias_variance_tradeoff(results):
     # Fig 1. plot
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
     # First y-axis for Bias²
-    ax1.plot(results['degree'], results['bias_squared'], label='Bias²', color='skyblue', marker='o')
-    ax1.set_xlabel('Model Complexity (Degree)', fontsize=12)
+    ax1.plot(results['degree'], results['bias'], label='Bias²', color='skyblue', marker='o')
+    ax1.set_xlabel('Model complexity (degree)', fontsize=12)
     ax1.set_ylabel('Bias²', color='skyblue', fontsize=12)
     ax1.tick_params(axis='y', labelcolor='skyblue')
     ax1.grid(visible=True)
@@ -81,7 +45,7 @@ def main():
     # Figure 1 inputs
     st.sidebar.subheader('Inputs for Fig. 1')
     max_degree = st.sidebar.slider("Maximum polynomial degree", 1, 20, 10, step = 1)
-    nruns = st.sidebar.slider("Number of iterations", 1, 200, 50, step = 1)
+    #nruns = st.sidebar.slider("Number of iterations", 1, 200, 50, step = 1)
     x_vars = st.sidebar.multiselect("Predictors to include in models", options = ['carat', 'table', 'depth'], default = 'carat')
     # Fallback to default for when no vars are selected.
     if len(x_vars) == 0:
@@ -100,13 +64,13 @@ def main():
     if len(m2_vars) == 0:
         st.sidebar.write('Please select at least one variable! If none are selected, carats are shown by default!')
         m2_vars = ['carat']
-
-    # Extracting data from the source according to user inputs
-    f1_x = data[x_vars].values
-    y = data['price'].values
-
-    f2_x1 = data[m1_vars].values
-    f2_x2 = data[m2_vars].values
+    
+    #Introduction
+    st.subheader("Introduction")
+    st.write("""As discussed in class, the Mean Squared Error may be decomposed into two components: bias (squared) and variance. The bias of a prediction 
+    means that how much we are off in our predictions, on average. The variance captures how the prediction error varies around its mean across different 
+    predictions. Generally speaking, there is a trade-off between bias and variance of a prediction. The purpose of this application is to 
+    illustrate this problem on a real-life prediction problem.""")
     
     # Data description
     st.subheader("Dataset description")
@@ -117,7 +81,12 @@ def main():
     
     # Figure 1 computation and plotting
     st.subheader("Fig. 1: Visualizing the bias-variance trade-off")
-    results = compute_table(f1_x, y, max_degree, nruns)
+    results = (data[
+               (data['carat'] == int('carat' in x_vars))
+               & (data['depth'] == int('depth' in x_vars))
+               & (data['table'] == int('table' in x_vars))
+               & (data['degree'] <= max_degree)
+    ])
     plot_bias_variance_tradeoff(results)
 
     st.subheader("Interpretation")
@@ -125,7 +94,9 @@ def main():
     On the other hand, overly complex models show higher variance but lower bias. So selecting the best model for prediction is indeed a balancing game: 
     we want to aim for the sweet spot somewhere in the middle where both bias and variance are relatively low. Note, however, that where this spot lies 
     depends not only on the polynomial degrees of the model (one kind of complexity), but also on how many variables we include. If we play around with 
-    the inputs a bit, we can see that for models containing more and more variables, the sweet spot in terms of polynomial degrees is lower and lower.""")
+    the inputs a bit, we can see that for models containing more and more variables, the sweet spot in terms of polynomial degrees is lower and lower. Also, 
+    after surpassing the balanced point, we might observe some interesting things: even though the variance part tends to grow with model complexity 
+    (as expected), the bias component shows some interesting variation between very complex models.""")
 
     # Figure 2
     st.subheader("Comparing two models directly")
@@ -135,8 +106,30 @@ def main():
     
     # Figure 2 plotting
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-    mse_1, bias_squared_1, variance_1 = calc_metrics(f2_x1, y, m1_degree, nruns)
-    mse_2, bias_squared_2, variance_2 = calc_metrics(f2_x2, y, m2_degree, nruns)
+    bias_squared_1 = (data[
+               (data['carat'] == int('carat' in m1_vars))
+               & (data['depth'] == int('depth' in m1_vars))
+               & (data['table'] == int('table' in m1_vars))
+               & (data['degree'] == m1_degree)
+    ]).bias.iloc[0]
+    variance_1 = (data[
+               (data['carat'] == int('carat' in m1_vars))
+               & (data['depth'] == int('depth' in m1_vars))
+               & (data['table'] == int('table' in m1_vars))
+               & (data['degree'] == m1_degree)
+    ]).variance.iloc[0]
+    bias_squared_2 = (data[
+               (data['carat'] == int('carat' in m2_vars))
+               & (data['depth'] == int('depth' in m2_vars))
+               & (data['table'] == int('table' in m2_vars))
+               & (data['degree'] == m2_degree)
+    ]).bias.iloc[0]
+    variance_2 = (data[
+               (data['carat'] == int('carat' in m2_vars))
+               & (data['depth'] == int('depth' in m2_vars))
+               & (data['table'] == int('table' in m2_vars))
+               & (data['degree'] == m2_degree)
+    ]).variance.iloc[0]
     plot_bias_variance_pie(1, bias_squared_1, variance_1, axes[0])
     plot_bias_variance_pie(2, bias_squared_2, variance_2, axes[1])
     st.pyplot(fig)
@@ -149,8 +142,8 @@ def main():
     st.write("""The way this dashboard calculates the MSE decomposition is quite complex. First, it creates a 2:1 train-test split randomly.
     Then, using the mlxtend package, it creates bootstrap sample from the train set a number of times set by the user to mimic variability in the 
     original data. Then, the models estimated over the bootstrap samples are evaluated over the test set. Finally, the needed metrics are 
-    calculated by using all the bootstrap predictions over the test sample. Note every model estimation is done on the fly, so cranking up all 
-    inputs two maximum complexity may result in very slow outputs.""")
+    calculated by using all the bootstrap predictions over the test sample. Note that every model estimation have been done beforehand and the results are 
+    stored in a CSV file for dashboard efficiency.""")
 
     # AI use notes
     st.subheader("AI use disclaimer")
