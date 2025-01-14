@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-data = pd.read_csv('simulated_data.csv')
+data = pd.read_csv('https://raw.githubusercontent.com/marton-nagy-marton/Data-Analysis-3/refs/heads/main/Extra_Assignment_1/simulated_data.csv')
     
 def plot_bias_variance_tradeoff(results):
     # Fig 1. plot
