@@ -236,6 +236,7 @@ def price_diff_by_variables(
         #+ scale_fill_manual(name=dummy_lab, values=(color[1], color[0]))
         + ylab("Mean Price")
         + xlab(factor_lab)
+        + labs(fill = dummy_lab)
         + theme_bw()
         + theme(
             panel_grid_major=element_blank(),
@@ -256,7 +257,7 @@ from statsmodels.tools.eval_measures import rmse
 
 
 def ols_crossvalidator(
-    formula: str, data: pd.DataFrame, n_folds=5, average_rmse=True
+    formula: str, data: pd.DataFrame, n_folds=5, average_rmse=True, rstate =  42
 ) -> dict:
     """OLS cross-validator
 
@@ -276,6 +277,7 @@ def ols_crossvalidator(
     average_rmse : bool, default=True
         Whether to return the average train and test RMSE of the k-fold CV, or return
         train and test RMSE-s for each fold.
+    rstate : random state to use in KFold CV
 
     """
 
@@ -297,7 +299,7 @@ def ols_crossvalidator(
 
     # Calculating test and train RMSE-s for each fold
 
-    k = KFold(n_splits=n_folds, shuffle=False, random_state=None)
+    k = KFold(n_splits=n_folds, shuffle=True, random_state=rstate)
 
     rmse_train = []
     rmse_test = []
